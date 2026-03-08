@@ -3,7 +3,10 @@ package blinker.go.ui.extensions
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.view.ViewGroup
+import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -26,11 +29,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import blinker.go.data.extension.ExtensionInjector
+import blinker.go.data.extension.ExtensionUrlHandler
 
 @SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExtensionOptionsScreen(
+    extensionId: String,
     extensionName: String,
     optionsUrl: String,
     onBack: () -> Unit
@@ -47,7 +52,6 @@ fun ExtensionOptionsScreen(
                 domStorageEnabled = true
                 databaseEnabled = true
                 allowFileAccess = true
-                allowContentAccess = true
                 @Suppress("DEPRECATION")
                 allowFileAccessFromFileURLs = true
                 @Suppress("DEPRECATION")
@@ -61,54 +65,47 @@ fun ExtensionOptionsScreen(
             }
 
             webViewClient = object : WebViewClient() {
-                override fun onPageStarted(
-                    view: WebView?, url: String?, favicon: Bitmap?
-                ) {
-                    view?.let { ExtensionInjector.injectApiShim(it) }
+                override fun shouldInterceptRequest(
+                    view: WebView, request: WebResourceRequest
+                ): WebResourceResponse? {
+                    return ExtensionUrlHandler.handleRequest(request.url, context)
+                        ?: super.shouldInterceptRequest(view, request)
+                }
+
+                override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                    view?.evaluateJavascript(
+                        ExtensionInjector.getApiShim(extensionId), null
+                    )
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
-                    view?.let { ExtensionInjector.injectApiShim(it) }
+                    view?.evaluateJavascript(
+                        ExtensionInjector.getApiShim(extensionId), null
+                    )
                 }
             }
 
             webChromeClient = object : WebChromeClient() {
-                override fun onConsoleMessage(
-                    message: android.webkit.ConsoleMessage?
-                ): Boolean {
-                    return true
-                }
+                override fun onConsoleMessage(msg: ConsoleMessage?): Boolean = true
             }
 
             loadUrl(optionsUrl)
         }
     }
 
-    DisposableEffect(Unit) {
-        onDispose { webView.destroy() }
-    }
+    DisposableEffect(Unit) { onDispose { webView.destroy() } }
 
     BackHandler {
-        if (webView.canGoBack()) webView.goBack()
-        else onBack()
+        if (webView.canGoBack()) webView.goBack() else onBack()
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "$extensionName Settings",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
+                title = { Text("$extensionName Settings", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
-                            "Back"
-                        )
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back")
                     }
                 }
             )
@@ -116,9 +113,7 @@ fun ExtensionOptionsScreen(
     ) { padding ->
         AndroidView(
             factory = { webView },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+            modifier = Modifier.fillMaxSize().padding(padding)
         )
     }
 }

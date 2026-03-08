@@ -18,8 +18,13 @@ data class ExtensionInfo(
     val type: ExtensionType = ExtensionType.CRX,
     val permissions: List<String> = emptyList(),
     val iconPath: String? = null,
-    val optionsPage: String? = null
-)
+    val optionsPage: String? = null,
+    val backgroundScripts: List<String> = emptyList(),
+    val backgroundPage: String? = null
+) {
+    val hasBackground: Boolean
+        get() = backgroundScripts.isNotEmpty() || backgroundPage != null
+}
 
 enum class ExtensionType(val label: String) {
     CRX("Chrome Extension"),
