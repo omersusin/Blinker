@@ -18,7 +18,7 @@ object ExtensionParser {
         try {
             val stream = context.contentResolver.openInputStream(uri) ?: return null
             bytes = stream.use { it.readBytes() }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             return null
         }
 
@@ -59,17 +59,87 @@ object ExtensionParser {
                 return null
             }
 
-            return buildInfo(manifest, id, type)
-        } catch (e: Exception) {
+            // Load i18n messages
+            val messages = loadMessages(manifest, extDir)
+
+            return buildInfo(manifest, id, type, messages)
+        } catch (_: Exception) {
             extDir.deleteRecursively()
             return null
+        }
+    }
+
+    /**
+     * Load localized messages from _locales directory.
+     * Tries: default_locale → en → en_US → first available
+     */
+    private fun loadMessages(
+        manifest: JSONObject,
+        extDir: File
+    ): Map<String, String> {
+        val localesDir = File(extDir, "_locales")
+        if (!localesDir.exists()) return emptyMap()
+
+        val defaultLocale = manifest.optString("default_locale", "")
+
+        // Try locales in priority order
+        val candidates = mutableListOf<String>()
+        if (defaultLocale.isNotEmpty()) candidates.add(defaultLocale)
+        candidates.addAll(listOf("en", "en_US", "en_GB"))
+
+        var messagesFile: File? = null
+        for (locale in candidates) {
+            val f = File(localesDir, "$locale/messages.json")
+            if (f.exists()) {
+                messagesFile = f
+                break
+            }
+        }
+
+        // Fallback: first available locale
+        if (messagesFile == null) {
+            localesDir.listFiles()?.firstOrNull { it.isDirectory }?.let { dir ->
+                val f = File(dir, "messages.json")
+                if (f.exists()) messagesFile = f
+            }
+        }
+
+        if (messagesFile == null) return emptyMap()
+
+        return try {
+            val json = JSONObject(messagesFile!!.readText())
+            val map = mutableMapOf<String, String>()
+            json.keys().forEach { key ->
+                val msgObj = json.optJSONObject(key)
+                val message = msgObj?.optString("message", "") ?: ""
+                if (message.isNotEmpty()) {
+                    map[key.lowercase()] = message
+                }
+            }
+            map
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    /**
+     * Resolve __MSG_key__ placeholders using messages map
+     */
+    private fun resolveI18n(text: String, messages: Map<String, String>): String {
+        if (!text.contains("__MSG_")) return text
+
+        val regex = Regex("__MSG_(\\w+)__")
+        return regex.replace(text) { match ->
+            val key = match.groupValues[1].lowercase()
+            messages[key] ?: match.value
         }
     }
 
     private fun detectType(bytes: ByteArray): ExtensionType? {
         if (bytes.size < 4) return null
         if (bytes[0] == 0x43.toByte() && bytes[1] == 0x72.toByte() &&
-            bytes[2] == 0x32.toByte() && bytes[3] == 0x34.toByte()) {
+            bytes[2] == 0x32.toByte() && bytes[3] == 0x34.toByte()
+        ) {
             return ExtensionType.CRX
         }
         if (bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte()) {
@@ -112,11 +182,16 @@ object ExtensionParser {
     private fun buildInfo(
         manifest: JSONObject,
         id: String,
-        type: ExtensionType
+        type: ExtensionType,
+        messages: Map<String, String>
     ): ExtensionInfo {
-        val name = manifest.optString("name", "Unknown Extension")
+        val rawName = manifest.optString("name", "Unknown Extension")
+        val rawDesc = manifest.optString("description", "")
         val version = manifest.optString("version", "0.0")
-        val description = manifest.optString("description", "")
+
+        // Resolve i18n placeholders
+        val name = resolveI18n(rawName, messages)
+        val description = resolveI18n(rawDesc, messages)
 
         val contentScripts = mutableListOf<ContentScript>()
         manifest.optJSONArray("content_scripts")?.let { csArray ->
