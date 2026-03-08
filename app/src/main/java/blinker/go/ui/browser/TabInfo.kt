@@ -11,7 +11,7 @@ class TabInfo(
     initialUrl: String = "https://www.google.com"
 ) {
     var url by mutableStateOf(initialUrl)
-    var title by mutableStateOf("Yeni Sekme")
+    var title by mutableStateOf("New Tab")
     var isSecure by mutableStateOf(initialUrl.startsWith("https"))
     var isLoading by mutableStateOf(true)
     var progress by mutableIntStateOf(0)

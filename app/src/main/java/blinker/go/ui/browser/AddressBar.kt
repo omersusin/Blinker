@@ -23,7 +23,6 @@ import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -76,7 +75,7 @@ fun AddressBar(
             Icon(
                 imageVector = if (isSecure) Icons.Rounded.Lock
                               else Icons.Rounded.LockOpen,
-                contentDescription = if (isSecure) "Güvenli" else "Güvensiz",
+                contentDescription = if (isSecure) "Secure" else "Not secure",
                 tint = if (isSecure) MaterialTheme.colorScheme.primary
                        else MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(18.dp)
@@ -119,7 +118,7 @@ fun AddressBar(
 
                 if (text.isEmpty()) {
                     Text(
-                        text = "Ara veya URL gir",
+                        text = "Search or enter URL",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                         maxLines = 1,

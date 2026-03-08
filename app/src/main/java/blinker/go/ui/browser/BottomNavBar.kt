@@ -62,7 +62,7 @@ fun BottomNavBar(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = "Geri",
+                    contentDescription = "Back",
                     tint = if (canGoBack) MaterialTheme.colorScheme.onSurface
                            else MaterialTheme.colorScheme.onSurface.copy(alpha = disabledAlpha)
                 )
@@ -75,7 +75,7 @@ fun BottomNavBar(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                    contentDescription = "İleri",
+                    contentDescription = "Forward",
                     tint = if (canGoForward) MaterialTheme.colorScheme.onSurface
                            else MaterialTheme.colorScheme.onSurface.copy(alpha = disabledAlpha)
                 )
@@ -87,7 +87,7 @@ fun BottomNavBar(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Home,
-                    contentDescription = "Ana Sayfa",
+                    contentDescription = "Home",
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
@@ -99,7 +99,7 @@ fun BottomNavBar(
                 Icon(
                     imageVector = if (isLoading) Icons.Rounded.Close
                                   else Icons.Rounded.Refresh,
-                    contentDescription = if (isLoading) "Durdur" else "Yenile",
+                    contentDescription = if (isLoading) "Stop" else "Refresh",
                     tint = MaterialTheme.colorScheme.onSurface
                 )
             }

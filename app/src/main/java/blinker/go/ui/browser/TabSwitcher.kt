@@ -61,14 +61,14 @@ fun TabSwitcher(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "${tabs.size} sekme",
+                text = "${tabs.size} tab${if (tabs.size != 1) "s" else ""}",
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onBackground
             )
             IconButton(onClick = onDismiss) {
                 Icon(
                     imageVector = Icons.Rounded.Close,
-                    contentDescription = "Kapat",
+                    contentDescription = "Close",
                     tint = MaterialTheme.colorScheme.onBackground
                 )
             }
@@ -107,7 +107,7 @@ fun TabSwitcher(
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text(text = "Yeni Sekme")
+            Text(text = "New Tab")
         }
     }
 }
@@ -146,7 +146,7 @@ private fun TabCard(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Close,
-                    contentDescription = "Sekmeyi kapat",
+                    contentDescription = "Close tab",
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
