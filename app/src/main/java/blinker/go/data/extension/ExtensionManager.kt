@@ -1,6 +1,8 @@
 package blinker.go.data.extension
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import org.json.JSONArray
 import org.json.JSONObject
@@ -63,6 +65,15 @@ class ExtensionManager(private val context: Context) {
         } else null
     }
 
+    fun loadIcon(extensionId: String, iconPath: String?): Bitmap? {
+        if (iconPath == null) return null
+        val file = File(context.filesDir, "extensions/$extensionId/$iconPath")
+        if (!file.exists()) return null
+        return try {
+            BitmapFactory.decodeFile(file.absolutePath)
+        } catch (_: Exception) { null }
+    }
+
     private fun urlMatches(
         url: String,
         matches: List<String>,
@@ -98,6 +109,7 @@ class ExtensionManager(private val context: Context) {
         put("description", ext.description)
         put("enabled", ext.enabled)
         put("type", ext.type.name)
+        put("iconPath", ext.iconPath ?: "")
         put("permissions", JSONArray(ext.permissions))
         put("content_scripts", JSONArray().apply {
             ext.contentScripts.forEach { cs ->
@@ -114,6 +126,7 @@ class ExtensionManager(private val context: Context) {
 
     private fun deserialize(obj: JSONObject): ExtensionInfo {
         val csArray = obj.optJSONArray("content_scripts") ?: JSONArray()
+        val iconPathStr = obj.optString("iconPath", "")
         return ExtensionInfo(
             id = obj.getString("id"),
             name = obj.getString("name"),
@@ -124,6 +137,7 @@ class ExtensionManager(private val context: Context) {
                 ExtensionType.valueOf(obj.optString("type", "CRX"))
             } catch (_: Exception) { ExtensionType.CRX },
             permissions = toList(obj.optJSONArray("permissions")),
+            iconPath = iconPathStr.ifEmpty { null },
             contentScripts = (0 until csArray.length()).map { i ->
                 val cs = csArray.getJSONObject(i)
                 ContentScript(

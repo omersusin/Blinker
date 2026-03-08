@@ -16,7 +16,8 @@ data class ExtensionInfo(
     val contentScripts: List<ContentScript> = emptyList(),
     val enabled: Boolean = true,
     val type: ExtensionType = ExtensionType.CRX,
-    val permissions: List<String> = emptyList()
+    val permissions: List<String> = emptyList(),
+    val iconPath: String? = null
 )
 
 enum class ExtensionType(val label: String) {

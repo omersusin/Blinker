@@ -421,6 +421,7 @@ fun BrowserScreen(
 
     if (showExtensions) {
         ExtensionsSheet(
+            loadIcon = { id, path -> extensionManager.loadIcon(id, path) },
             extensions = extensionList,
             onDismiss = { showExtensions = false },
             onToggle = { id, enabled ->

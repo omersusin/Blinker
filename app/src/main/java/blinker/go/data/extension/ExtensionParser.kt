@@ -59,20 +59,14 @@ object ExtensionParser {
                 return null
             }
 
-            // Load i18n messages
             val messages = loadMessages(manifest, extDir)
-
-            return buildInfo(manifest, id, type, messages)
+            return buildInfo(manifest, id, type, messages, extDir)
         } catch (_: Exception) {
             extDir.deleteRecursively()
             return null
         }
     }
 
-    /**
-     * Load localized messages from _locales directory.
-     * Tries: default_locale → en → en_US → first available
-     */
     private fun loadMessages(
         manifest: JSONObject,
         extDir: File
@@ -81,8 +75,6 @@ object ExtensionParser {
         if (!localesDir.exists()) return emptyMap()
 
         val defaultLocale = manifest.optString("default_locale", "")
-
-        // Try locales in priority order
         val candidates = mutableListOf<String>()
         if (defaultLocale.isNotEmpty()) candidates.add(defaultLocale)
         candidates.addAll(listOf("en", "en_US", "en_GB"))
@@ -96,7 +88,6 @@ object ExtensionParser {
             }
         }
 
-        // Fallback: first available locale
         if (messagesFile == null) {
             localesDir.listFiles()?.firstOrNull { it.isDirectory }?.let { dir ->
                 val f = File(dir, "messages.json")
@@ -122,17 +113,62 @@ object ExtensionParser {
         }
     }
 
-    /**
-     * Resolve __MSG_key__ placeholders using messages map
-     */
     private fun resolveI18n(text: String, messages: Map<String, String>): String {
         if (!text.contains("__MSG_")) return text
-
         val regex = Regex("__MSG_(\\w+)__")
         return regex.replace(text) { match ->
             val key = match.groupValues[1].lowercase()
             messages[key] ?: match.value
         }
+    }
+
+    /**
+     * Extract best icon path from manifest.
+     * Prefers largest available: 128 > 96 > 64 > 48 > 32 > 16
+     */
+    private fun findBestIcon(manifest: JSONObject, extDir: File): String? {
+        val iconsObj = manifest.optJSONObject("icons")
+        if (iconsObj != null) {
+            val preferred = listOf("128", "96", "64", "48", "32", "16")
+            for (size in preferred) {
+                val path = iconsObj.optString(size, "")
+                if (path.isNotEmpty()) {
+                    val file = File(extDir, path)
+                    if (file.exists()) return path
+                }
+            }
+            // Fallback: try any available key
+            iconsObj.keys().forEach { key ->
+                val path = iconsObj.optString(key, "")
+                if (path.isNotEmpty()) {
+                    val file = File(extDir, path)
+                    if (file.exists()) return path
+                }
+            }
+        }
+
+        // Try browser_action or action icons
+        val action = manifest.optJSONObject("browser_action")
+            ?: manifest.optJSONObject("action")
+        if (action != null) {
+            val actionIcons = action.optJSONObject("default_icon")
+            if (actionIcons != null) {
+                actionIcons.keys().forEach { key ->
+                    val path = actionIcons.optString(key, "")
+                    if (path.isNotEmpty()) {
+                        val file = File(extDir, path)
+                        if (file.exists()) return path
+                    }
+                }
+            }
+            val singleIcon = action.optString("default_icon", "")
+            if (singleIcon.isNotEmpty()) {
+                val file = File(extDir, singleIcon)
+                if (file.exists()) return singleIcon
+            }
+        }
+
+        return null
     }
 
     private fun detectType(bytes: ByteArray): ExtensionType? {
@@ -183,15 +219,16 @@ object ExtensionParser {
         manifest: JSONObject,
         id: String,
         type: ExtensionType,
-        messages: Map<String, String>
+        messages: Map<String, String>,
+        extDir: File
     ): ExtensionInfo {
         val rawName = manifest.optString("name", "Unknown Extension")
         val rawDesc = manifest.optString("description", "")
         val version = manifest.optString("version", "0.0")
 
-        // Resolve i18n placeholders
         val name = resolveI18n(rawName, messages)
         val description = resolveI18n(rawDesc, messages)
+        val iconPath = findBestIcon(manifest, extDir)
 
         val contentScripts = mutableListOf<ContentScript>()
         manifest.optJSONArray("content_scripts")?.let { csArray ->
@@ -216,7 +253,8 @@ object ExtensionParser {
             description = description,
             contentScripts = contentScripts,
             type = type,
-            permissions = toList(manifest.optJSONArray("permissions"))
+            permissions = toList(manifest.optJSONArray("permissions")),
+            iconPath = iconPath
         )
     }
 

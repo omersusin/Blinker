@@ -1,5 +1,8 @@
 package blinker.go.ui.extensions
 
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,8 +32,12 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import blinker.go.data.extension.ExtensionInfo
@@ -42,7 +49,8 @@ fun ExtensionsSheet(
     onDismiss: () -> Unit,
     onToggle: (String, Boolean) -> Unit,
     onDelete: (String) -> Unit,
-    onInstall: () -> Unit
+    onInstall: () -> Unit,
+    loadIcon: (String, String?) -> Bitmap?
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -86,6 +94,9 @@ fun ExtensionsSheet(
                     items(extensions, key = { it.id }) { ext ->
                         ExtensionItem(
                             ext = ext,
+                            icon = remember(ext.id, ext.iconPath) {
+                                loadIcon(ext.id, ext.iconPath)
+                            },
                             onToggle = { enabled -> onToggle(ext.id, enabled) },
                             onDelete = { onDelete(ext.id) }
                         )
@@ -121,6 +132,7 @@ fun ExtensionsSheet(
 @Composable
 private fun ExtensionItem(
     ext: ExtensionInfo,
+    icon: Bitmap?,
     onToggle: (Boolean) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -130,14 +142,41 @@ private fun ExtensionItem(
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = Icons.Rounded.Extension,
-            contentDescription = null,
-            modifier = Modifier.size(36.dp),
-            tint = if (ext.enabled) MaterialTheme.colorScheme.primary
-                   else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-        )
+        // Extension icon
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(
+                    MaterialTheme.colorScheme.surfaceVariant.copy(
+                        alpha = if (ext.enabled) 1f else 0.5f
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            if (icon != null && !icon.isRecycled) {
+                Image(
+                    bitmap = icon.asImageBitmap(),
+                    contentDescription = ext.name,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    contentScale = ContentScale.Fit,
+                    alpha = if (ext.enabled) 1f else 0.4f
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Rounded.Extension,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = if (ext.enabled) MaterialTheme.colorScheme.primary
+                           else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                )
+            }
+        }
+
         Spacer(Modifier.width(12.dp))
+
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = ext.name,
@@ -168,6 +207,7 @@ private fun ExtensionItem(
                 )
             }
         }
+
         Switch(checked = ext.enabled, onCheckedChange = onToggle)
         Spacer(Modifier.width(4.dp))
         IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
