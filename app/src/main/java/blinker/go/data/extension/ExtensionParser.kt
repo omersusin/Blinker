@@ -122,10 +122,6 @@ object ExtensionParser {
         }
     }
 
-    /**
-     * Extract best icon path from manifest.
-     * Prefers largest available: 128 > 96 > 64 > 48 > 32 > 16
-     */
     private fun findBestIcon(manifest: JSONObject, extDir: File): String? {
         val iconsObj = manifest.optJSONObject("icons")
         if (iconsObj != null) {
@@ -137,7 +133,6 @@ object ExtensionParser {
                     if (file.exists()) return path
                 }
             }
-            // Fallback: try any available key
             iconsObj.keys().forEach { key ->
                 val path = iconsObj.optString(key, "")
                 if (path.isNotEmpty()) {
@@ -147,7 +142,6 @@ object ExtensionParser {
             }
         }
 
-        // Try browser_action or action icons
         val action = manifest.optJSONObject("browser_action")
             ?: manifest.optJSONObject("action")
         if (action != null) {
@@ -166,6 +160,32 @@ object ExtensionParser {
                 val file = File(extDir, singleIcon)
                 if (file.exists()) return singleIcon
             }
+        }
+
+        return null
+    }
+
+    /**
+     * Find options page from manifest.
+     * Chrome: options_page or options_ui.page
+     * Firefox: options_ui.page
+     */
+    private fun findOptionsPage(manifest: JSONObject, extDir: File): String? {
+        // options_ui.page (modern)
+        val optionsUi = manifest.optJSONObject("options_ui")
+        if (optionsUi != null) {
+            val page = optionsUi.optString("page", "")
+            if (page.isNotEmpty()) {
+                val file = File(extDir, page)
+                if (file.exists()) return page
+            }
+        }
+
+        // options_page (legacy)
+        val optionsPage = manifest.optString("options_page", "")
+        if (optionsPage.isNotEmpty()) {
+            val file = File(extDir, optionsPage)
+            if (file.exists()) return optionsPage
         }
 
         return null
@@ -229,6 +249,7 @@ object ExtensionParser {
         val name = resolveI18n(rawName, messages)
         val description = resolveI18n(rawDesc, messages)
         val iconPath = findBestIcon(manifest, extDir)
+        val optionsPage = findOptionsPage(manifest, extDir)
 
         val contentScripts = mutableListOf<ContentScript>()
         manifest.optJSONArray("content_scripts")?.let { csArray ->
@@ -254,7 +275,8 @@ object ExtensionParser {
             contentScripts = contentScripts,
             type = type,
             permissions = toList(manifest.optJSONArray("permissions")),
-            iconPath = iconPath
+            iconPath = iconPath,
+            optionsPage = optionsPage
         )
     }
 

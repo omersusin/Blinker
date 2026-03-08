@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Extension
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -50,6 +51,7 @@ fun ExtensionsSheet(
     onToggle: (String, Boolean) -> Unit,
     onDelete: (String) -> Unit,
     onInstall: () -> Unit,
+    onOpenOptions: (ExtensionInfo) -> Unit,
     loadIcon: (String, String?) -> Bitmap?
 ) {
     ModalBottomSheet(
@@ -98,7 +100,8 @@ fun ExtensionsSheet(
                                 loadIcon(ext.id, ext.iconPath)
                             },
                             onToggle = { enabled -> onToggle(ext.id, enabled) },
-                            onDelete = { onDelete(ext.id) }
+                            onDelete = { onDelete(ext.id) },
+                            onOpenOptions = { onOpenOptions(ext) }
                         )
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
                     }
@@ -134,7 +137,8 @@ private fun ExtensionItem(
     ext: ExtensionInfo,
     icon: Bitmap?,
     onToggle: (Boolean) -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onOpenOptions: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -142,7 +146,6 @@ private fun ExtensionItem(
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Extension icon
         Box(
             modifier = Modifier
                 .size(40.dp)
@@ -208,8 +211,25 @@ private fun ExtensionItem(
             }
         }
 
+        // Options gear — only if extension has options page
+        if (ext.optionsPage != null) {
+            IconButton(
+                onClick = onOpenOptions,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Settings,
+                    contentDescription = "Settings",
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+        }
+
         Switch(checked = ext.enabled, onCheckedChange = onToggle)
+
         Spacer(Modifier.width(4.dp))
+
         IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
             Icon(
                 imageVector = Icons.Rounded.Delete,

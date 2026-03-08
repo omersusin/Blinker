@@ -74,6 +74,15 @@ class ExtensionManager(private val context: Context) {
         } catch (_: Exception) { null }
     }
 
+    /**
+     * Get the full file:// URL for an extension's options page
+     */
+    fun getOptionsPageUrl(extensionId: String, optionsPage: String?): String? {
+        if (optionsPage == null) return null
+        val file = File(context.filesDir, "extensions/$extensionId/$optionsPage")
+        return if (file.exists()) "file://${file.absolutePath}" else null
+    }
+
     private fun urlMatches(
         url: String,
         matches: List<String>,
@@ -110,6 +119,7 @@ class ExtensionManager(private val context: Context) {
         put("enabled", ext.enabled)
         put("type", ext.type.name)
         put("iconPath", ext.iconPath ?: "")
+        put("optionsPage", ext.optionsPage ?: "")
         put("permissions", JSONArray(ext.permissions))
         put("content_scripts", JSONArray().apply {
             ext.contentScripts.forEach { cs ->
@@ -127,6 +137,7 @@ class ExtensionManager(private val context: Context) {
     private fun deserialize(obj: JSONObject): ExtensionInfo {
         val csArray = obj.optJSONArray("content_scripts") ?: JSONArray()
         val iconPathStr = obj.optString("iconPath", "")
+        val optionsPageStr = obj.optString("optionsPage", "")
         return ExtensionInfo(
             id = obj.getString("id"),
             name = obj.getString("name"),
@@ -138,6 +149,7 @@ class ExtensionManager(private val context: Context) {
             } catch (_: Exception) { ExtensionType.CRX },
             permissions = toList(obj.optJSONArray("permissions")),
             iconPath = iconPathStr.ifEmpty { null },
+            optionsPage = optionsPageStr.ifEmpty { null },
             contentScripts = (0 until csArray.length()).map { i ->
                 val cs = csArray.getJSONObject(i)
                 ContentScript(

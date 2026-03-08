@@ -44,6 +44,7 @@ import blinker.go.data.HistoryManager
 import blinker.go.data.extension.ExtensionInfo
 import blinker.go.data.extension.ExtensionInjector
 import blinker.go.data.extension.ExtensionManager
+import blinker.go.ui.extensions.ExtensionOptionsScreen
 import blinker.go.ui.extensions.ExtensionsSheet
 
 private const val DESKTOP_UA =
@@ -216,6 +217,10 @@ fun BrowserScreen(
     var showExtensions by remember { mutableStateOf(false) }
     var extensionList by remember { mutableStateOf(emptyList<ExtensionInfo>()) }
 
+    // Extension options screen state
+    var optionsExt by remember { mutableStateOf<ExtensionInfo?>(null) }
+    var optionsUrl by remember { mutableStateOf<String?>(null) }
+
     val bookmarkManager = remember { BookmarkManager(context) }
     val historyManager = remember { HistoryManager(context) }
     val extensionManager = remember { ExtensionManager(context) }
@@ -234,6 +239,8 @@ fun BrowserScreen(
                     "Installed: ${result.name}",
                     Toast.LENGTH_SHORT
                 ).show()
+                extensionList = extensionManager.getAll()
+                showExtensions = true
             } else {
                 Toast.makeText(
                     context,
@@ -345,6 +352,19 @@ fun BrowserScreen(
         }
     }
 
+    // ── Extension Options Screen ──
+    if (optionsExt != null && optionsUrl != null) {
+        ExtensionOptionsScreen(
+            extensionName = optionsExt!!.name,
+            optionsUrl = optionsUrl!!,
+            onBack = {
+                optionsExt = null
+                optionsUrl = null
+            }
+        )
+        return
+    }
+
     BackHandler(
         enabled = showTabSwitcher || showFindInPage || activeTab.canGoBack
     ) {
@@ -421,7 +441,6 @@ fun BrowserScreen(
 
     if (showExtensions) {
         ExtensionsSheet(
-            loadIcon = { id, path -> extensionManager.loadIcon(id, path) },
             extensions = extensionList,
             onDismiss = { showExtensions = false },
             onToggle = { id, enabled ->
@@ -435,6 +454,25 @@ fun BrowserScreen(
             onInstall = {
                 showExtensions = false
                 extPickerLauncher.launch(arrayOf("*/*"))
+            },
+            onOpenOptions = { ext ->
+                val url = extensionManager.getOptionsPageUrl(
+                    ext.id, ext.optionsPage
+                )
+                if (url != null) {
+                    showExtensions = false
+                    optionsExt = ext
+                    optionsUrl = url
+                } else {
+                    Toast.makeText(
+                        context,
+                        "No options page available",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            },
+            loadIcon = { id, path ->
+                extensionManager.loadIcon(id, path)
             }
         )
     }
