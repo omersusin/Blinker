@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "go.blinker"
+    namespace = "blinker.go"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "go.blinker"
+        applicationId = "blinker.go"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -42,7 +42,6 @@ android {
 }
 
 dependencies {
-    // Compose BOM — tüm Compose sürümlerini tek yerden yönetir
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)
 

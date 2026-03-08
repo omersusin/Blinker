@@ -1,4 +1,4 @@
-package go.blinker.ui.theme
+package blinker.go.ui.theme
 
 import android.app.Activity
 import android.os.Build
