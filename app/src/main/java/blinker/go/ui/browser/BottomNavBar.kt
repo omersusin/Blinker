@@ -13,9 +13,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,13 +31,12 @@ import androidx.compose.ui.unit.sp
 fun BottomNavBar(
     canGoBack: Boolean,
     canGoForward: Boolean,
-    isLoading: Boolean,
     tabCount: Int,
     onBack: () -> Unit,
     onForward: () -> Unit,
     onHome: () -> Unit,
-    onRefresh: () -> Unit,
     onShowTabs: () -> Unit,
+    onShowMenu: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -93,18 +91,6 @@ fun BottomNavBar(
             }
 
             IconButton(
-                onClick = onRefresh,
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = if (isLoading) Icons.Rounded.Close
-                                  else Icons.Rounded.Refresh,
-                    contentDescription = if (isLoading) "Stop" else "Refresh",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            IconButton(
                 onClick = onShowTabs,
                 modifier = Modifier.weight(1f)
             ) {
@@ -127,6 +113,17 @@ fun BottomNavBar(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
+            }
+
+            IconButton(
+                onClick = onShowMenu,
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.MoreVert,
+                    contentDescription = "Menu",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
             }
         }
     }

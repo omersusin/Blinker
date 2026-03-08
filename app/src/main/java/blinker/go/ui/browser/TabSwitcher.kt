@@ -1,6 +1,7 @@
 package blinker.go.ui.browser
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +36,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
@@ -101,13 +105,9 @@ fun TabSwitcher(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Icon(
-                imageVector = Icons.Rounded.Add,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(text = "New Tab")
+            Icon(Icons.Rounded.Add, null, Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("New Tab")
         }
     }
 }
@@ -121,66 +121,76 @@ private fun TabCard(
 ) {
     Card(
         onClick = onSelect,
-        modifier = Modifier.height(160.dp),
+        modifier = Modifier.height(180.dp),
         shape = RoundedCornerShape(12.dp),
         border = if (isActive) BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
                  else null
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 12.dp, end = 4.dp, top = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = tab.title,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            IconButton(
-                onClick = onClose,
-                modifier = Modifier.size(28.dp)
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 4.dp, top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.Close,
-                    contentDescription = "Close tab",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(12.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Language,
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = tab.url
-                        .removePrefix("https://")
-                        .removePrefix("http://")
-                        .removePrefix("www.")
-                        .take(30),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    text = tab.title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelLarge,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "Close tab",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                val bmp = tab.thumbnail
+                if (bmp != null && !bmp.isRecycled) {
+                    Image(
+                        bitmap = bmp.asImageBitmap(),
+                        contentDescription = "Tab preview",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Rounded.Language,
+                            contentDescription = null,
+                            modifier = Modifier.size(32.dp),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = tab.url
+                                .removePrefix("https://")
+                                .removePrefix("http://")
+                                .removePrefix("www.")
+                                .take(30),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
         }
     }

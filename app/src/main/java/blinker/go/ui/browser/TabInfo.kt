@@ -1,5 +1,6 @@
 package blinker.go.ui.browser
 
+import android.graphics.Bitmap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -17,4 +18,5 @@ class TabInfo(
     var progress by mutableIntStateOf(0)
     var canGoBack by mutableStateOf(false)
     var canGoForward by mutableStateOf(false)
+    var thumbnail by mutableStateOf<Bitmap?>(null)
 }

@@ -18,9 +18,12 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -48,6 +51,7 @@ fun AddressBar(
     isLoading: Boolean,
     progress: Int,
     onUrlSubmit: (String) -> Unit,
+    onRefreshOrStop: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var text by remember { mutableStateOf(url) }
@@ -55,9 +59,7 @@ fun AddressBar(
     val focusManager = LocalFocusManager.current
 
     LaunchedEffect(url) {
-        if (!isFocused) {
-            text = url
-        }
+        if (!isFocused) text = url
     }
 
     Column(
@@ -125,6 +127,21 @@ fun AddressBar(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            IconButton(
+                onClick = onRefreshOrStop,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = if (isLoading) Icons.Rounded.Close
+                                  else Icons.Rounded.Refresh,
+                    contentDescription = if (isLoading) "Stop" else "Refresh",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
             }
         }
 
