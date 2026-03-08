@@ -1,13 +1,14 @@
 package blinker.go.ui.browser
 
 import android.annotation.SuppressLint
+import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
+import android.os.Environment
 import android.view.ViewGroup
-import android.webkit.CookieManager
 import android.webkit.URLUtil
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -33,37 +34,39 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import blinker.go.data.BlinkerSettings
 import blinker.go.data.Bookmark
 import blinker.go.data.BookmarkManager
 import blinker.go.data.HistoryEntry
 import blinker.go.data.HistoryManager
-import blinker.go.data.download.DownloadEngine
-import blinker.go.ui.downloads.DownloadsScreen
 
-private const val HOME_URL = "https://www.google.com"
-private const val SEARCH_URL = "https://www.google.com/search?q="
 private const val DESKTOP_UA =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-private fun processInput(input: String): String {
+private fun processInput(input: String, homeUrl: String, searchUrl: String): String {
     val trimmed = input.trim()
     return when {
-        trimmed.isEmpty() -> HOME_URL
+        trimmed.isEmpty() -> homeUrl
         trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
         trimmed.contains(".") && !trimmed.contains(" ") -> "https://$trimmed"
-        else -> SEARCH_URL + Uri.encode(trimmed)
+        else -> searchUrl + Uri.encode(trimmed)
     }
 }
 
 private fun captureWebViewThumbnail(webView: WebView): Bitmap? {
     if (webView.width <= 0 || webView.height <= 0) return null
     return try {
-        val s = 0.3f
-        val w = (webView.width * s).toInt()
-        val h = (webView.height * s).toInt()
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565)
-        val c = Canvas(bmp); c.scale(s, s); webView.draw(c); bmp
-    } catch (_: Exception) { null }
+        val scale = 0.3f
+        val w = (webView.width * scale).toInt()
+        val h = (webView.height * scale).toInt()
+        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565)
+        val canvas = Canvas(bitmap)
+        canvas.scale(scale, scale)
+        webView.draw(canvas)
+        bitmap
+    } catch (_: Exception) {
+        null
+    }
 }
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -71,9 +74,9 @@ private fun createConfiguredWebView(
     context: Context,
     tab: TabInfo,
     isDesktopMode: Boolean,
+    appSettings: BlinkerSettings,
     onFindResult: (Int, Int) -> Unit,
-    onPageLoaded: (String, String) -> Unit,
-    onDownload: (String, String, String, String) -> Unit
+    onPageLoaded: (String, String) -> Unit
 ): WebView {
     return WebView(context).apply {
         layoutParams = ViewGroup.LayoutParams(
@@ -82,7 +85,8 @@ private fun createConfiguredWebView(
         )
 
         settings.apply {
-            javaScriptEnabled = true
+            javaScriptEnabled = appSettings.javaScriptEnabled
+            javaScriptCanOpenWindowsAutomatically = !appSettings.blockPopups
             domStorageEnabled = true
             databaseEnabled = true
             setSupportZoom(true)
@@ -118,10 +122,11 @@ private fun createConfiguredWebView(
                 url?.let { tab.url = it }
                 view?.title?.let { if (it.isNotBlank()) tab.title = it }
                 view?.let { tab.thumbnail = captureWebViewThumbnail(it) }
-                val fUrl = url ?: return
-                val fTitle = view?.title ?: fUrl
-                if (fUrl.startsWith("http://") || fUrl.startsWith("https://")) {
-                    onPageLoaded(fUrl, fTitle)
+
+                val finalUrl = url ?: return
+                val finalTitle = view?.title ?: finalUrl
+                if (finalUrl.startsWith("http://") || finalUrl.startsWith("https://")) {
+                    onPageLoaded(finalUrl, finalTitle)
                 }
             }
 
@@ -140,12 +145,33 @@ private fun createConfiguredWebView(
             }
         }
 
-        setFindListener { activeOrdinal, count, done ->
-            if (done) onFindResult(activeOrdinal + 1, count)
+        setFindListener { activeMatchOrdinal, numberOfMatches, isDoneCounting ->
+            if (isDoneCounting) {
+                onFindResult(activeMatchOrdinal + 1, numberOfMatches)
+            }
         }
 
         setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
-            onDownload(url, userAgent, contentDisposition, mimeType)
+            try {
+                val fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                val request = DownloadManager.Request(Uri.parse(url)).apply {
+                    setMimeType(mimeType)
+                    addRequestHeader("User-Agent", userAgent)
+                    setTitle(fileName)
+                    setDescription("Downloading...")
+                    setNotificationVisibility(
+                        DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+                    )
+                    setDestinationInExternalPublicDir(
+                        Environment.DIRECTORY_DOWNLOADS, fileName
+                    )
+                }
+                val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                dm.enqueue(request)
+                Toast.makeText(context, "Downloading: $fileName", Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {
+                Toast.makeText(context, "Download failed", Toast.LENGTH_SHORT).show()
+            }
         }
 
         loadUrl(tab.url)
@@ -153,10 +179,15 @@ private fun createConfiguredWebView(
 }
 
 @Composable
-fun BrowserScreen() {
+fun BrowserScreen(
+    settings: BlinkerSettings,
+    onOpenSettings: () -> Unit
+) {
     val context = LocalContext.current
+    val homeUrl = settings.homepageUrl
+    val searchUrl = settings.searchEngine.searchUrl
 
-    val tabs = remember { mutableStateListOf(TabInfo()) }
+    val tabs = remember { mutableStateListOf(TabInfo(initialUrl = homeUrl)) }
     var activeTabId by remember { mutableStateOf(tabs.first().id) }
     var showTabSwitcher by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
@@ -167,20 +198,25 @@ fun BrowserScreen() {
 
     var showBookmarks by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
-    var showDownloads by remember { mutableStateOf(false) }
     var isBookmarked by remember { mutableStateOf(false) }
     var bookmarkList by remember { mutableStateOf(emptyList<Bookmark>()) }
     var historyList by remember { mutableStateOf(emptyList<HistoryEntry>()) }
 
     val bookmarkManager = remember { BookmarkManager(context) }
     val historyManager = remember { HistoryManager(context) }
-    val downloadEngine = remember { DownloadEngine.getInstance(context) }
 
     val webViews = remember { mutableMapOf<String, WebView>() }
     val activeTab = tabs.find { it.id == activeTabId } ?: tabs.first()
 
     LaunchedEffect(activeTab.url) {
         isBookmarked = bookmarkManager.isBookmarked(activeTab.url)
+    }
+
+    LaunchedEffect(settings.javaScriptEnabled, settings.blockPopups) {
+        webViews.values.forEach { wv ->
+            wv.settings.javaScriptEnabled = settings.javaScriptEnabled
+            wv.settings.javaScriptCanOpenWindowsAutomatically = !settings.blockPopups
+        }
     }
 
     DisposableEffect(Unit) {
@@ -196,39 +232,48 @@ fun BrowserScreen() {
         }
     }
 
-    fun addNewTab(url: String = HOME_URL) {
+    fun addNewTab(url: String = homeUrl) {
         captureThumbnail(activeTabId)
-        val t = TabInfo(initialUrl = url)
-        tabs.add(t); activeTabId = t.id
+        val newTab = TabInfo(initialUrl = url)
+        tabs.add(newTab)
+        activeTabId = newTab.id
         showTabSwitcher = false
     }
 
     fun closeTab(id: String) {
-        webViews[id]?.destroy(); webViews.remove(id)
-        val idx = tabs.indexOfFirst { it.id == id }
+        webViews[id]?.destroy()
+        webViews.remove(id)
+        val index = tabs.indexOfFirst { it.id == id }
         tabs.removeAll { it.id == id }
-        if (tabs.isEmpty()) addNewTab()
-        else if (activeTabId == id) activeTabId = tabs[maxOf(0, idx - 1)].id
+        if (tabs.isEmpty()) {
+            addNewTab()
+        } else if (activeTabId == id) {
+            activeTabId = tabs[maxOf(0, index - 1)].id
+        }
     }
 
     fun closeAllTabs() {
-        webViews.values.forEach { it.destroy() }; webViews.clear()
-        tabs.clear(); addNewTab()
+        webViews.values.forEach { it.destroy() }
+        webViews.clear()
+        tabs.clear()
+        addNewTab()
     }
 
     fun switchTab(id: String) {
-        captureThumbnail(activeTabId); activeTabId = id
-        showTabSwitcher = false; showFindInPage = false
+        captureThumbnail(activeTabId)
+        activeTabId = id
+        showTabSwitcher = false
+        showFindInPage = false
         webViews[id]?.clearMatches()
     }
 
     fun shareCurrentPage() {
-        val i = Intent(Intent.ACTION_SEND).apply {
+        val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, activeTab.url)
             putExtra(Intent.EXTRA_SUBJECT, activeTab.title)
         }
-        context.startActivity(Intent.createChooser(i, null))
+        context.startActivity(Intent.createChooser(intent, null))
     }
 
     fun toggleDesktopMode() {
@@ -240,18 +285,29 @@ fun BrowserScreen() {
     }
 
     fun toggleBookmark() {
-        if (isBookmarked) bookmarkManager.remove(activeTab.url)
-        else bookmarkManager.add(Bookmark(url = activeTab.url, title = activeTab.title))
+        if (isBookmarked) {
+            bookmarkManager.remove(activeTab.url)
+        } else {
+            bookmarkManager.add(
+                Bookmark(url = activeTab.url, title = activeTab.title)
+            )
+        }
         isBookmarked = !isBookmarked
     }
 
-    BackHandler(
-        enabled = showTabSwitcher || showFindInPage || showDownloads || activeTab.canGoBack
-    ) {
+    fun openDownloads() {
+        try {
+            context.startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS))
+        } catch (_: Exception) {
+            Toast.makeText(context, "Cannot open Downloads", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    BackHandler(enabled = showTabSwitcher || showFindInPage || activeTab.canGoBack) {
         when {
-            showDownloads -> showDownloads = false
             showFindInPage -> {
-                showFindInPage = false; webViews[activeTabId]?.clearMatches()
+                showFindInPage = false
+                webViews[activeTabId]?.clearMatches()
             }
             showTabSwitcher -> showTabSwitcher = false
             else -> webViews[activeTabId]?.goBack()
@@ -266,15 +322,18 @@ fun BrowserScreen() {
             onNewTab = { addNewTab() },
             onToggleBookmark = { toggleBookmark() },
             onBookmarks = {
-                bookmarkList = bookmarkManager.getAll(); showBookmarks = true
+                bookmarkList = bookmarkManager.getAll()
+                showBookmarks = true
             },
             onHistory = {
-                historyList = historyManager.getAll(); showHistory = true
+                historyList = historyManager.getAll()
+                showHistory = true
             },
             onShare = { shareCurrentPage() },
             onFindInPage = { showFindInPage = true },
             onDesktopMode = { toggleDesktopMode() },
-            onDownloads = { showDownloads = true },
+            onDownloads = { openDownloads() },
+            onSettings = { onOpenSettings() },
             onCloseAllTabs = { closeAllTabs() }
         )
     }
@@ -284,7 +343,8 @@ fun BrowserScreen() {
             bookmarks = bookmarkList,
             onDismiss = { showBookmarks = false },
             onBookmarkClick = { url ->
-                webViews[activeTabId]?.loadUrl(url); showBookmarks = false
+                webViews[activeTabId]?.loadUrl(url)
+                showBookmarks = false
             },
             onBookmarkDelete = { url ->
                 bookmarkManager.remove(url)
@@ -299,21 +359,22 @@ fun BrowserScreen() {
             history = historyList,
             onDismiss = { showHistory = false },
             onHistoryClick = { url ->
-                webViews[activeTabId]?.loadUrl(url); showHistory = false
+                webViews[activeTabId]?.loadUrl(url)
+                showHistory = false
             },
-            onClearAll = { historyManager.clear(); historyList = emptyList() }
+            onClearAll = {
+                historyManager.clear()
+                historyList = emptyList()
+            }
         )
     }
 
-    if (showDownloads) {
-        DownloadsScreen(
-            engine = downloadEngine,
-            onDismiss = { showDownloads = false }
-        )
-    } else if (showTabSwitcher) {
+    if (showTabSwitcher) {
         TabSwitcher(
-            tabs = tabs, activeTabId = activeTabId,
-            onTabSelect = ::switchTab, onTabClose = ::closeTab,
+            tabs = tabs,
+            activeTabId = activeTabId,
+            onTabSelect = ::switchTab,
+            onTabClose = ::closeTab,
             onNewTab = { addNewTab() },
             onDismiss = { showTabSwitcher = false }
         )
@@ -323,11 +384,13 @@ fun BrowserScreen() {
             topBar = {
                 if (showFindInPage) {
                     FindInPageBar(
-                        onQuery = { q ->
-                            if (q.isNotEmpty()) webViews[activeTabId]?.findAllAsync(q)
-                            else {
+                        onQuery = { query ->
+                            if (query.isNotEmpty()) {
+                                webViews[activeTabId]?.findAllAsync(query)
+                            } else {
                                 webViews[activeTabId]?.clearMatches()
-                                findActiveMatch = 0; findTotalMatches = 0
+                                findActiveMatch = 0
+                                findTotalMatches = 0
                             }
                         },
                         onNext = { webViews[activeTabId]?.findNext(true) },
@@ -335,7 +398,8 @@ fun BrowserScreen() {
                         onDismiss = {
                             showFindInPage = false
                             webViews[activeTabId]?.clearMatches()
-                            findActiveMatch = 0; findTotalMatches = 0
+                            findActiveMatch = 0
+                            findTotalMatches = 0
                         },
                         activeMatch = findActiveMatch,
                         totalMatches = findTotalMatches
@@ -346,7 +410,11 @@ fun BrowserScreen() {
                         isSecure = activeTab.isSecure,
                         isLoading = activeTab.isLoading,
                         progress = activeTab.progress,
-                        onUrlSubmit = { webViews[activeTabId]?.loadUrl(processInput(it)) },
+                        onUrlSubmit = { input ->
+                            webViews[activeTabId]?.loadUrl(
+                                processInput(input, homeUrl, searchUrl)
+                            )
+                        },
                         onRefreshOrStop = {
                             if (activeTab.isLoading) webViews[activeTabId]?.stopLoading()
                             else webViews[activeTabId]?.reload()
@@ -361,9 +429,10 @@ fun BrowserScreen() {
                     tabCount = tabs.size,
                     onBack = { webViews[activeTabId]?.goBack() },
                     onForward = { webViews[activeTabId]?.goForward() },
-                    onHome = { webViews[activeTabId]?.loadUrl(HOME_URL) },
+                    onHome = { webViews[activeTabId]?.loadUrl(homeUrl) },
                     onShowTabs = {
-                        captureThumbnail(activeTabId); showTabSwitcher = true
+                        captureThumbnail(activeTabId)
+                        showTabSwitcher = true
                     },
                     onShowMenu = { showMenu = true }
                 )
@@ -376,28 +445,25 @@ fun BrowserScreen() {
                 factory = { ctx -> FrameLayout(ctx) },
                 update = { container ->
                     container.removeAllViews()
-                    val curTab = tabs.find { it.id == activeTabId } ?: tabs.first()
-                    val wv = webViews.getOrPut(activeTabId) {
+                    val currentTab = tabs.find { it.id == activeTabId } ?: tabs.first()
+                    val webView = webViews.getOrPut(activeTabId) {
                         createConfiguredWebView(
-                            context, curTab, isDesktopMode,
-                            onFindResult = { a, t ->
-                                findActiveMatch = a; findTotalMatches = t
+                            context, currentTab, isDesktopMode, settings,
+                            onFindResult = { active, total ->
+                                findActiveMatch = active
+                                findTotalMatches = total
                             },
                             onPageLoaded = { url, title ->
-                                historyManager.add(HistoryEntry(url = url, title = title))
-                            },
-                            onDownload = { url, ua, cd, mime ->
-                                val name = URLUtil.guessFileName(url, cd, mime)
-                                val cookies = CookieManager.getInstance().getCookie(url)
-                                downloadEngine.startDownload(url, name, mime, ua, cookies)
-                                Toast.makeText(context, "Downloading: $name", Toast.LENGTH_SHORT)
-                                    .show()
+                                historyManager.add(
+                                    HistoryEntry(url = url, title = title)
+                                )
                             }
                         )
                     }
-                    (wv.parent as? ViewGroup)?.removeView(wv)
+                    (webView.parent as? ViewGroup)?.removeView(webView)
                     container.addView(
-                        wv, FrameLayout.LayoutParams(
+                        webView,
+                        FrameLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )

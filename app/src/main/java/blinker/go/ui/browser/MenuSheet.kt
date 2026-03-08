@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,6 +49,7 @@ fun MenuSheet(
     onFindInPage: () -> Unit,
     onDesktopMode: () -> Unit,
     onDownloads: () -> Unit,
+    onSettings: () -> Unit,
     onCloseAllTabs: () -> Unit
 ) {
     ModalBottomSheet(
@@ -63,26 +65,21 @@ fun MenuSheet(
             MenuItem(Icons.Rounded.Add, "New Tab") {
                 onDismiss(); onNewTab()
             }
-
             MenuItem(
                 icon = if (isBookmarked) Icons.Rounded.Bookmark
                        else Icons.Rounded.BookmarkBorder,
                 text = if (isBookmarked) "Remove Bookmark"
                        else "Add Bookmark"
-            ) {
-                onDismiss(); onToggleBookmark()
-            }
+            ) { onDismiss(); onToggleBookmark() }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             MenuItem(Icons.Rounded.Star, "Bookmarks") {
                 onDismiss(); onBookmarks()
             }
-
             MenuItem(Icons.Rounded.History, "History") {
                 onDismiss(); onHistory()
             }
-
             MenuItem(Icons.Rounded.Download, "Downloads") {
                 onDismiss(); onDownloads()
             }
@@ -92,18 +89,20 @@ fun MenuSheet(
             MenuItem(Icons.Rounded.Share, "Share") {
                 onDismiss(); onShare()
             }
-
             MenuItem(Icons.Rounded.Search, "Find in Page") {
                 onDismiss(); onFindInPage()
             }
-
             MenuItem(
                 icon = if (isDesktopMode) Icons.Rounded.PhoneAndroid
                        else Icons.Rounded.DesktopWindows,
                 text = if (isDesktopMode) "Mobile Site"
                        else "Desktop Site"
-            ) {
-                onDismiss(); onDesktopMode()
+            ) { onDismiss(); onDesktopMode() }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            MenuItem(Icons.Rounded.Settings, "Settings") {
+                onDismiss(); onSettings()
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
