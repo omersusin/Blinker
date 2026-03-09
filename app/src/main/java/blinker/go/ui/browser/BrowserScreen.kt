@@ -42,11 +42,14 @@ import blinker.go.data.Bookmark
 import blinker.go.data.BookmarkManager
 import blinker.go.data.HistoryEntry
 import blinker.go.data.HistoryManager
+import blinker.go.data.download.DownloadEngine
 import blinker.go.data.extension.ExtensionInfo
 import blinker.go.data.extension.ExtensionInjector
 import blinker.go.data.extension.ExtensionManager
 import blinker.go.data.extension.ExtensionRuntime
 import blinker.go.data.extension.ExtensionUrlHandler
+import blinker.go.data.extension.ExtensionTabManager
+import blinker.go.data.extension.ExtensionBridge
 import blinker.go.ui.extensions.ExtensionOptionsScreen
 import blinker.go.ui.extensions.ExtensionsSheet
 
@@ -79,6 +82,7 @@ private fun createWebView(
 ): WebView = WebView(ctx).apply {
     layoutParams = ViewGroup.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+    addJavascriptInterface(ExtensionBridge(ctx), "BlinkerBridge")
     this.settings.apply {
         javaScriptEnabled = settings.javaScriptEnabled
         javaScriptCanOpenWindowsAutomatically = !settings.blockPopups
@@ -120,17 +124,10 @@ private fun createWebView(
     }
     setFindListener { a, n, d -> if (d) onFind(a + 1, n) }
     setDownloadListener { url, ua, cd, mime, _ ->
-        try {
-            val fn = URLUtil.guessFileName(url, cd, mime)
-            val req = DownloadManager.Request(Uri.parse(url)).apply {
-                setMimeType(mime); addRequestHeader("User-Agent", ua); setTitle(fn)
-                setDescription("Downloading...")
-                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fn)
-            }
-            (ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
-            Toast.makeText(ctx, "Downloading: $fn", Toast.LENGTH_SHORT).show()
-        } catch (_: Exception) { Toast.makeText(ctx, "Download failed", Toast.LENGTH_SHORT).show() }
+        val fn = URLUtil.guessFileName(url, cd, mime)
+        val cookies = android.webkit.CookieManager.getInstance().getCookie(url)
+        DownloadEngine.getInstance(ctx).startDownload(url, fn, mime ?: "*/*", ua ?: "", cookies)
+        Toast.makeText(ctx, "Download started: $fn", Toast.LENGTH_SHORT).show()
     }
     loadUrl(tab.url)
 }
@@ -145,6 +142,7 @@ fun BrowserScreen(settings: BlinkerSettings, onOpenSettings: () -> Unit) {
     var activeTabId by remember { mutableStateOf(tabs.first().id) }
     var showTabs by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var showDl by remember { mutableStateOf(false) }
     var desktop by remember { mutableStateOf(false) }
     var showFind by remember { mutableStateOf(false) }
     var findA by remember { mutableIntStateOf(0) }
@@ -196,7 +194,10 @@ fun BrowserScreen(settings: BlinkerSettings, onOpenSettings: () -> Unit) {
     fun share() { ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, tab.url); putExtra(Intent.EXTRA_SUBJECT, tab.title) }, null)) }
     fun toggleDt() { desktop = !desktop; wvs.forEach { (_, w) -> w.settings.userAgentString = if (desktop) DESKTOP_UA else null }; wvs[activeTabId]?.reload() }
     fun toggleBm() { if (isBm) bmMgr.remove(tab.url) else bmMgr.add(Bookmark(url = tab.url, title = tab.title)); isBm = !isBm }
-    fun openDl() { try { ctx.startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)) } catch (_: Exception) { Toast.makeText(ctx, "Cannot open Downloads", Toast.LENGTH_SHORT).show() } }
+    fun openDl() { showDl = true }
+
+    LaunchedEffect(Unit) { ExtensionTabManager.onTabCreateRequest = { url -> addTab(url) } }
+    LaunchedEffect(tabs.size, activeTabId, tab.url, tab.title) { ExtensionTabManager.updateTabs(tabs.toList(), activeTabId) }
 
     if (optExt != null && optUrl != null) {
         ExtensionOptionsScreen(extensionId = optExt!!.id, extensionName = optExt!!.name, optionsUrl = optUrl!!, onBack = { optExt = null; optUrl = null })
@@ -235,7 +236,14 @@ fun BrowserScreen(settings: BlinkerSettings, onOpenSettings: () -> Unit) {
         },
         loadIcon = { id, path -> extMgr.loadIcon(id, path) })
 
-    if (showTabs) TabSwitcher(tabs = tabs, activeTabId = activeTabId, onTabSelect = ::switchTo, onTabClose = ::closeTab, onNewTab = { addTab() }, onDismiss = { showTabs = false })
+    if (showDl) {
+        androidx.compose.material3.Surface(modifier = Modifier.fillMaxSize(), color = androidx.compose.material3.MaterialTheme.colorScheme.background) {
+            blinker.go.ui.downloads.DownloadsScreen(
+                engine = blinker.go.data.download.DownloadEngine.getInstance(ctx),
+                onDismiss = { showDl = false }
+            )
+        }
+    } else if (showTabs) TabSwitcher(tabs = tabs, activeTabId = activeTabId, onTabSelect = ::switchTo, onTabClose = ::closeTab, onNewTab = { addTab() }, onDismiss = { showTabs = false })
     else Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             if (showFind) FindInPageBar(

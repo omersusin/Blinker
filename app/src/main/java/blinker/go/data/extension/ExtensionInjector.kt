@@ -14,20 +14,13 @@ object ExtensionInjector {
         append("if(typeof browser==='undefined')window.browser=chrome;")
 
         // storage.local & storage.sync
-        append("var _s={};")
+        append("var _s=window.BlinkerBridge;")
         append("function _mkStore(){return{")
-        append("get:function(k,c){var r={};")
-        append("if(typeof k==='string'){if(_s[k]!==undefined)r[k]=_s[k];}")
-        append("else if(Array.isArray(k))k.forEach(function(x){if(_s[x]!==undefined)r[x]=_s[x];});")
-        append("else if(k===null||k===undefined)r=Object.assign({},_s);")
-        append("else{var keys=Object.keys(k);keys.forEach(function(x){r[x]=_s[x]!==undefined?_s[x]:k[x];})}")
-        append("if(c)c(r);return Promise.resolve(r);},")
-        append("set:function(i,c){Object.assign(_s,i);if(c)c();return Promise.resolve();},")
-        append("remove:function(k,c){if(typeof k==='string')k=[k];")
-        append("if(Array.isArray(k))k.forEach(function(x){delete _s[x];});")
-        append("if(c)c();return Promise.resolve();},")
-        append("clear:function(c){_s={};if(c)c();return Promise.resolve();},")
-        append("getBytesInUse:function(k,c){var n=JSON.stringify(_s).length;if(c)c(n);return Promise.resolve(n);}");
+        append("get:function(k,c){var ks=k===undefined||k===null?'null':JSON.stringify(k);var r=JSON.parse(_s.storageLocalGet('$extensionId',ks));if(c)c(r);return Promise.resolve(r);},")
+        append("set:function(i,c){_s.storageLocalSet('$extensionId',JSON.stringify(i));if(c)c();return Promise.resolve();},")
+        append("remove:function(k,c){var ks=typeof k==='string'?'\"'+k+'\"':JSON.stringify(k);_s.storageLocalRemove('$extensionId',ks);if(c)c();return Promise.resolve();},")
+        append("clear:function(c){_s.storageLocalClear('$extensionId');if(c)c();return Promise.resolve();},")
+        append("getBytesInUse:function(k,c){var n=0;if(c)c(n);return Promise.resolve(n);}");
         append("};}")
         append("if(!chrome.storage)chrome.storage={};")
         append("if(!chrome.storage.local)chrome.storage.local=_mkStore();")
@@ -52,8 +45,8 @@ object ExtensionInjector {
 
         // tabs
         append("if(!chrome.tabs)chrome.tabs={};")
-        append("if(!chrome.tabs.query)chrome.tabs.query=function(q,c){var r=[];if(c)c(r);return Promise.resolve(r);};")
-        append("if(!chrome.tabs.create)chrome.tabs.create=function(o,c){if(o&&o.url)window.open(o.url);if(c)c({});return Promise.resolve({});};")
+        append("if(!chrome.tabs.query)chrome.tabs.query=function(q,c){var r=JSON.parse(_s.tabsQuery());if(c)c(r);return Promise.resolve(r);};")
+        append("if(!chrome.tabs.create)chrome.tabs.create=function(o,c){if(o&&o.url)_s.tabsCreate(o.url);if(c)c({});return Promise.resolve({});};")
         append("if(!chrome.tabs.sendMessage)chrome.tabs.sendMessage=function(t,m,c){if(c)c();return Promise.resolve();};")
         append("if(!chrome.tabs.onUpdated)chrome.tabs.onUpdated={addListener:function(){},removeListener:function(){}};")
         append("if(!chrome.tabs.onRemoved)chrome.tabs.onRemoved={addListener:function(){},removeListener:function(){}};")

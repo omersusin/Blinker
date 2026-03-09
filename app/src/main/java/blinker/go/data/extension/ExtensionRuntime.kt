@@ -12,6 +12,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import blinker.go.data.extension.ExtensionBridge
 
 @SuppressLint("SetJavaScriptEnabled")
 class ExtensionRuntime(private val context: Context) {
@@ -50,6 +51,7 @@ class ExtensionRuntime(private val context: Context) {
 
         val webView = WebView(context).apply {
             layoutParams = ViewGroup.LayoutParams(0, 0)
+            addJavascriptInterface(ExtensionBridge(context), "BlinkerBridge")
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true

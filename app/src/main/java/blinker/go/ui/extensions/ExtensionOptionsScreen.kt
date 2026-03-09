@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import blinker.go.data.extension.ExtensionInjector
 import blinker.go.data.extension.ExtensionUrlHandler
+import blinker.go.data.extension.ExtensionBridge
 
 @SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,6 +48,7 @@ fun ExtensionOptionsScreen(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
+            addJavascriptInterface(ExtensionBridge(context), "BlinkerBridge")
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
