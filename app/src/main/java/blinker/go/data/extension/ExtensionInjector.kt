@@ -32,8 +32,20 @@ object ExtensionInjector {
         // runtime
         append("if(!chrome.runtime)chrome.runtime={};")
         append("chrome.runtime.id='$extensionId';")
-        append("if(!chrome.runtime.sendMessage)chrome.runtime.sendMessage=function(){return Promise.resolve();};")
-        append("if(!chrome.runtime.onMessage)chrome.runtime.onMessage={addListener:function(){},removeListener:function(){},hasListener:function(){return false;}};")
+        // Real sendMessage: routes to background page via the Kotlin bridge
+        append("if(!chrome.runtime.sendMessage)chrome.runtime.sendMessage=function(extOrMsg,msgOrOpts,optsOrCb,cb){")
+        append("var msg=(typeof extOrMsg==='object'&&extOrMsg!==null)?extOrMsg:msgOrOpts;")
+        append("var callback=(typeof msgOrOpts==='function')?msgOrOpts:(typeof optsOrCb==='function')?optsOrCb:cb;")
+        append("var senderJson=JSON.stringify({id:'$extensionId',url:window.location.href});")
+        append("try{_s.postMessageToBackground('$extensionId',JSON.stringify(msg),senderJson);}catch(e){}")
+        append("if(typeof callback==='function')setTimeout(function(){callback();},0);")
+        append("return Promise.resolve();};")
+        // Real onMessage: listeners stored in window.__blinkerMsgListeners so the bus can dispatch
+        append("if(!window.__blinkerMsgListeners)window.__blinkerMsgListeners=[];")
+        append("if(!chrome.runtime.onMessage)chrome.runtime.onMessage={")
+        append("addListener:function(fn){window.__blinkerMsgListeners.push(fn);},")
+        append("removeListener:function(fn){window.__blinkerMsgListeners=window.__blinkerMsgListeners.filter(function(f){return f!==fn;});},")
+        append("hasListener:function(fn){return window.__blinkerMsgListeners.indexOf(fn)>=0;}};")
         append("if(!chrome.runtime.onConnect)chrome.runtime.onConnect={addListener:function(){},removeListener:function(){}};")
         append("if(!chrome.runtime.connect)chrome.runtime.connect=function(){return{postMessage:function(){},onMessage:{addListener:function(){}},onDisconnect:{addListener:function(){}}};};")
         append("if(!chrome.runtime.getURL)chrome.runtime.getURL=function(p){return '${ExtensionUrlHandler.BASE_URL}/$extensionId/'+p;};")
