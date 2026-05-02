@@ -73,6 +73,9 @@ class ExtensionRuntime(private val context: Context) {
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     Log.d("BlinkerExt", "Background loaded: ${ext.name}")
+                    // Inject the Chrome API shim into HTML background pages.
+                    // (Script-based backgrounds already have it embedded inline.)
+                    view?.evaluateJavascript(ExtensionInjector.getApiShim(ext.id), null)
                 }
             }
 
@@ -103,9 +106,11 @@ class ExtensionRuntime(private val context: Context) {
         }
 
         backgroundViews[ext.id] = webView
+        ExtensionMessageBus.register(ext.id, webView)
     }
 
     private fun stopBackground(id: String) {
+        ExtensionMessageBus.unregister(id)
         backgroundViews[id]?.destroy()
         backgroundViews.remove(id)
     }

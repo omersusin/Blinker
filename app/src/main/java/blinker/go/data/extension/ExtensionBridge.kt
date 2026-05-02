@@ -33,4 +33,17 @@ class ExtensionBridge(private val context: Context) {
     fun tabsCreate(url: String) {
         ExtensionTabManager.onTabCreateRequest?.invoke(url)
     }
+
+    /**
+     * Routes a message from a content script to the extension's background page.
+     * Called by the JS shim when chrome.runtime.sendMessage() is invoked.
+     *
+     * @param extId       The sending extension's id.
+     * @param messageJson JSON.stringify'd message payload.
+     * @param senderJson  JSON.stringify'd sender info (url, tab id, etc.).
+     */
+    @JavascriptInterface
+    fun postMessageToBackground(extId: String, messageJson: String, senderJson: String) {
+        ExtensionMessageBus.dispatchToBackground(extId, messageJson, senderJson)
+    }
 }
